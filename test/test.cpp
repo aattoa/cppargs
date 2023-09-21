@@ -1,10 +1,34 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cppargs.hpp>
 
-TEST_CASE("cppargs")
+TEST_CASE("cppargs::Parameters::help_string", "[cppargs]")
 {
-    char const* const command_line[] { "cppargstest", "--version" };
+    SECTION("non-empty")
+    {
+        cppargs::Parameters parameters;
 
+        (void)parameters.add("help", { .description = "Show this help text" });
+        (void)parameters.add<cppargs::Int>("do-thing");
+        (void)parameters.add("version", { .description = "Show version information" });
+        (void)parameters.add<cppargs::Str>(
+            "interesting", { .description = "Do interesting things" });
+
+        REQUIRE(
+            parameters.help_string()
+            == "\t--help              : Show this help text\n"
+               "\t--do-thing [int]    : ...\n"
+               "\t--version           : Show version information\n"
+               "\t--interesting [str] : Do interesting things\n");
+    }
+    SECTION("empty")
+    {
+        REQUIRE(cppargs::Parameters().help_string().empty());
+    }
+}
+
+TEST_CASE("cppargs::parse", "[cppargs]")
+{
+    char const* const   command_line[] { "cppargstest", "--version" };
     cppargs::Parameters parameters;
 
     auto const help_flag    = parameters.add("help");
