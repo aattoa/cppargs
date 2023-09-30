@@ -1,40 +1,14 @@
 #include <cppargs.hpp>
+
 #include <type_traits>
 #include <algorithm>
+#include <cassert>
 #include <format>
 
-namespace {
-    template <class T>
-    constexpr auto type_description() noexcept
-    {
-        if constexpr (std::is_same_v<T, cppargs::Int>) {
-            return "int";
-        }
-        else if constexpr (std::is_same_v<T, cppargs::Float>) {
-            return "float";
-        }
-        else if constexpr (std::is_same_v<T, cppargs::Str>) {
-            return "str";
-        }
-        else if constexpr (std::is_same_v<T, cppargs::Bool>) {
-            return "bool";
-        }
-        else if constexpr (std::is_same_v<T, cppargs::Unit>) {
-            return "unit";
-        }
-        else {
-            static_assert(sizeof(T) == 0);
-        }
-    }
-} // namespace
-
-auto cppargs::parse(int const argc, char const* const* const argv, Parameters const& parameters)
-    -> Arguments
+cppargs::Arguments::Arguments(std::vector<std::string_view>&& vector) noexcept
+    : m_vector(std::move(vector))
 {
-    (void)argc;
-    (void)argv;
-    (void)parameters;
-    std::abort();
+    assert(!m_vector.empty());
 }
 
 auto cppargs::Parameters::help_string() const -> std::string
@@ -42,19 +16,16 @@ auto cppargs::Parameters::help_string() const -> std::string
     std::vector<std::pair<std::string, std::string_view>> lines;
     std::size_t                                           max_length {};
 
-    for (auto const& variant : vector) {
-        auto const visitor = [&]<class T>(Internal_parameter<T> const& parameter) {
-            std::string line = std::format("--{}", parameter.long_name);
-            if (parameter.short_name.has_value()) {
-                std::format_to(std::back_inserter(line), ", -{}", parameter.short_name.value());
-            }
-            if constexpr (!std::is_same_v<T, Unit>) {
-                std::format_to(std::back_inserter(line), " [{}]", type_description<T>());
-            }
-            max_length = std::max(max_length, line.size());
-            lines.emplace_back(std::move(line), parameter.detail.description);
-        };
-        std::visit(visitor, variant);
+    for (auto const& parameter : m_vector) {
+        std::string line = std::format("--{}", parameter.long_name);
+        if (parameter.short_name.has_value()) {
+            std::format_to(std::back_inserter(line), ", -{}", parameter.short_name.value());
+        }
+        if (!parameter.is_flag) {
+            line += " [arg]";
+        }
+        max_length = std::max(max_length, line.size());
+        lines.emplace_back(std::move(line), parameter.description);
     }
 
     std::string string;
@@ -67,4 +38,28 @@ auto cppargs::Parameters::help_string() const -> std::string
             description.empty() ? "..." : description);
     }
     return string;
+}
+
+auto cppargs::Parameters::size() const noexcept -> std::size_t
+{
+    return m_vector.size();
+}
+
+auto cppargs::Arguments::argv_0() const -> std::string_view
+{
+    assert(!m_vector.empty());
+    return m_vector.front();
+}
+
+auto cppargs::parse(int argc, char const* const* argv, Parameters const& parameters) -> Arguments
+{
+    assert(argc != 0);
+    assert(argv != nullptr);
+
+    std::vector<std::string_view> vector(parameters.size() + 1);
+    vector.front() = *argv;
+
+    // TODO
+
+    return Arguments { std::move(vector) };
 }
