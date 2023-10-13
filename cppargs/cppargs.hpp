@@ -14,6 +14,7 @@ namespace cppargs {
         enum class Kind {
             unrecognized_option,
             missing_argument,
+            positional_argument,
         };
         std::string command_line;
         Kind        kind {};
@@ -122,7 +123,7 @@ namespace cppargs {
         // Only `parse` can construct `Arguments`
         friend auto parse(Command_line, Parameters const&) -> Arguments;
     public:
-        // On most systems this returns the program name as it was invoked
+        // On most systems this will return the program name as it was invoked
         [[nodiscard]] auto argv_0() const -> std::optional<std::string_view>;
 
         // TODO: Parse argument and return optional<T>

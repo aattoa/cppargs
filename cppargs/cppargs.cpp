@@ -1,9 +1,4 @@
 #include <cppargs.hpp>
-
-// Only for todo()
-#include <source_location>
-#include <iostream>
-
 #include <type_traits>
 #include <algorithm>
 #include <cassert>
@@ -11,14 +6,6 @@
 #include <format>
 
 namespace {
-    [[noreturn]] auto todo(std::source_location const caller = std::source_location::current())
-        -> void
-    {
-        std::cerr << "Unimplemented branch reached on line " << caller.line() << ", in file "
-                  << caller.file_name() << std::endl;
-        std::exit(-1);
-    }
-
     [[nodiscard]] auto is_valid_command_line(cppargs::Command_line const command_line) noexcept
         -> bool
     {
@@ -53,12 +40,16 @@ cppargs::Exception::Exception(Parse_error_info&& parse_error_info)
     switch (m_parse_error_info.kind) {
     case Parse_error_info::Kind::missing_argument:
         m_exception_string = std::format(
-            "Error: cppargs: Missing argument for parameter '{}'",
-            error_substring(m_parse_error_info));
+            "Error: Missing argument for parameter '{}'", error_substring(m_parse_error_info));
         return;
     case Parse_error_info::Kind::unrecognized_option:
+        m_exception_string
+            = std::format("Error: Unrecognized option '{}'", error_substring(m_parse_error_info));
+        return;
+    case Parse_error_info::Kind::positional_argument:
         m_exception_string = std::format(
-            "Error: cppargs: Unrecognized option '{}'", error_substring(m_parse_error_info));
+            "Error: Positional arguments are not supported yet: '{}'",
+            error_substring(m_parse_error_info));
         return;
     default:
         throw std::invalid_argument {
@@ -90,7 +81,7 @@ auto cppargs::Parameters::help_string() const -> std::string
             std::format_to(std::back_inserter(line), ", -{}", parameter.short_name.value());
         }
         if (!parameter.is_flag) {
-            line += " [arg]";
+            line.append(" [arg]");
         }
         max_length = std::max(max_length, line.size());
         lines.emplace_back(std::move(line), parameter.description);
@@ -124,56 +115,76 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
         throw std::invalid_argument { "cppargs::parse: Invalid command line" };
     }
 
-    std::vector<std::optional<std::string_view>> argument_vector(parameters.info_span().size() + 1);
+    std::vector<std::optional<std::string_view>> arguments(parameters.info_span().size() + 1);
     std::size_t                                  current_column = 1;
 
     if (command_line.front() != nullptr) {
         std::string_view const string = command_line.front();
-        argument_vector.front()       = string;
+        arguments.front()             = string;
         current_column += (string.size() + 1);
     }
 
     for (auto arg_it = command_line.begin() + 1; arg_it != command_line.end(); ++arg_it) {
-        std::string_view string = *arg_it;
+        std::string_view const string = *arg_it;
+
+        auto const exception = [&](Parse_error_info::Kind const kind, std::string_view const view) {
+            assert(string.find(view) != std::string_view::npos);
+            return Exception { Parse_error_info {
+                .command_line = make_command_line_string(command_line),
+                .kind         = kind,
+                .error_column = current_column + std::distance(string.begin(), view.begin()),
+                .error_width  = view.size(),
+            } };
+        };
 
         if (string.starts_with("--")) {
-            string.remove_prefix(2);
-
-            auto const exception = [&](Parse_error_info::Kind const kind) {
-                return Exception { Parse_error_info {
-                    .command_line = make_command_line_string(command_line),
-                    .kind         = kind,
-                    .error_column = current_column + 2, // +2 for the "--"
-                    .error_width  = string.size(),
-                } };
-            };
-
-            auto const it = std::ranges::find(
-                parameters.info_span(), string, &dtl::Parameter_info::long_name);
+            auto const name = string.substr(2);
+            auto const it
+                = std::ranges::find(parameters.info_span(), name, &dtl::Parameter_info::long_name);
 
             if (it == parameters.info_span().end()) {
-                throw exception(Parse_error_info::Kind::unrecognized_option);
+                throw exception(Parse_error_info::Kind::unrecognized_option, name);
             }
-
-            if (it->is_flag) {
-                argument_vector.at(it->index).emplace();
+            else if (it->is_flag) {
+                arguments.at(it->index).emplace();
             }
             else if (++arg_it != command_line.end()) {
-                argument_vector.at(it->index) = *arg_it;
+                arguments.at(it->index) = *arg_it;
             }
             else {
-                throw exception(Parse_error_info::Kind::missing_argument);
+                throw exception(Parse_error_info::Kind::missing_argument, name);
             }
         }
         else if (string.starts_with('-')) {
-            todo();
+            for (auto char_it = string.begin() + 1; char_it != string.end(); ++char_it) {
+                auto const name = std::string_view(char_it, 1);
+                auto const it   = std::ranges::find(
+                    parameters.info_span(), *char_it, &dtl::Parameter_info::short_name);
+
+                if (it == parameters.info_span().end()) {
+                    throw exception(Parse_error_info::Kind::unrecognized_option, name);
+                }
+                else if (it->is_flag) {
+                    arguments.at(it->index).emplace();
+                }
+                else if (char_it + 1 != string.end()) {
+                    arguments.at(it->index).emplace(char_it + 1, string.end());
+                    break;
+                }
+                else if (++arg_it != command_line.end()) {
+                    arguments.at(it->index) = *arg_it;
+                }
+                else {
+                    throw exception(Parse_error_info::Kind::missing_argument, name);
+                }
+            }
         }
         else {
-            todo();
+            throw exception(Parse_error_info::Kind::positional_argument, string);
         }
 
         current_column += (string.size() + 1);
     }
 
-    return Arguments { std::move(argument_vector) };
+    return Arguments { std::move(arguments) };
 }
