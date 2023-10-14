@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <exception>
 #include <optional>
 #include <utility>
@@ -118,7 +119,7 @@ namespace cppargs {
     class Arguments {
         std::vector<std::optional<std::string_view>> m_vector;
 
-        explicit Arguments(decltype(m_vector)&& vector) noexcept : m_vector(std::move(vector)) {}
+        explicit Arguments(decltype(m_vector)&&) noexcept;
 
         // Only `parse` can construct `Arguments`
         friend auto parse(Command_line, Parameters const&) -> Arguments;
