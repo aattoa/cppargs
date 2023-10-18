@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <exception>
 #include <optional>
+#include <charconv>
 #include <utility>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@ namespace cppargs {
         enum class Kind {
             unrecognized_option,
             missing_argument,
+            invalid_argument,
             positional_argument,
         };
         std::string command_line;
@@ -38,80 +40,68 @@ namespace cppargs {
     // Regular void
     struct Unit {};
 
-    namespace dtl {
-        template <class>
-        struct Is_parameter_type : std::false_type {};
-
-        template <>
-        struct Is_parameter_type<std::string> : std::true_type {};
-
-        template <>
-        struct Is_parameter_type<std::string_view> : std::true_type {};
-
-        template <>
-        struct Is_parameter_type<Unit> : std::true_type {};
-
-        template <std::integral T>
-        struct Is_parameter_type<T> : std::true_type {};
-
-        template <class T>
-        struct Is_parameter_type<std::vector<T>> : Is_parameter_type<T> {};
-
-        template <class T>
-        struct Is_parameter_type<std::vector<std::vector<T>>> : std::false_type {};
-
-        struct Parameter_info {
-            std::string_view    long_name;
-            std::optional<char> short_name;
-            std::string_view    description;
-            bool                is_flag {};
-            std::size_t         index {};
-        };
-    } // namespace dtl
-
-    template <class T>
-    concept parameter_type = dtl::Is_parameter_type<T>::value;
-
-    template <parameter_type>
+    template <class>
     class Parameter {
         std::size_t index;
 
         explicit constexpr Parameter(std::size_t const index) noexcept : index(index) {}
-    public:
+
         friend class Parameters;
         friend class Arguments;
+    };
+
+    namespace dtl {
+        struct Parameter_info {
+            using Validate = auto(std::string_view) -> bool;
+            Validate*           validate {};
+            std::string_view    long_name;
+            std::optional<char> short_name;
+            std::string_view    description;
+            std::size_t         index {};
+        };
+    } // namespace dtl
+
+    template <class>
+    struct Argument {};
+
+    template <class T>
+    concept argument = requires(std::string_view const view) {
+        {
+            Argument<T>::parse(view)
+        } -> std::same_as<std::optional<T>>;
     };
 
     class Parameters {
         std::vector<dtl::Parameter_info> m_vector;
     public:
-        template <class T = Unit>
-        [[nodiscard]] auto
-        add(std::optional<char> const short_name,
+        [[nodiscard]] auto help_string() const -> std::string;
+        [[nodiscard]] auto info_span() const noexcept -> std::span<dtl::Parameter_info const>;
+
+        template <argument T = Unit>
+        [[nodiscard]] auto add(
+            std::optional<char> const short_name,
             std::string_view const    long_name,
             std::string_view const    description = {}) -> Parameter<T>
         {
-            auto const index = m_vector.size() + 1;
-            m_vector.push_back({
-                .long_name   = long_name,
-                .short_name  = short_name,
-                .description = description,
-                .is_flag     = std::is_same_v<T, Unit>,
-                .index       = index,
-            });
-            return Parameter<T> { index };
+            static constexpr dtl::Parameter_info::Validate* validate
+                = [](std::string_view const view) { return Argument<T>::parse(view).has_value(); };
+            return Parameter<T> { add_parameter(
+                short_name, long_name, description, std::is_same_v<T, Unit> ? nullptr : validate) };
         }
 
-        template <class T = Unit>
-        [[nodiscard]] auto
-        add(std::string_view const long_name, std::string_view const description = {})
+        template <argument T = Unit>
+        [[nodiscard]] auto add(
+            std::string_view const long_name, std::string_view const description = {})
             -> Parameter<T>
         {
             return add<T>(std::nullopt, long_name, description);
         }
-
-        [[nodiscard]] auto help_string() const -> std::string;
-        [[nodiscard]] auto info_span() const noexcept -> std::span<dtl::Parameter_info const>;
+    private:
+        auto add_parameter(
+            std::optional<char>            short_name,
+            std::string_view               long_name,
+            std::string_view               description,
+            dtl::Parameter_info::Validate* validate) -> std::size_t;
     };
 
     using Command_line = std::span<char const* const>;
@@ -127,15 +117,86 @@ namespace cppargs {
         // On most systems this will return the program name as it was invoked
         [[nodiscard]] auto argv_0() const -> std::optional<std::string_view>;
 
-        // TODO: Parse argument and return optional<T>
-        template <class T>
-        [[nodiscard]] auto operator[](Parameter<T> const& parameter) const
-            -> std::optional<std::string_view>
+        template <argument T>
+        [[nodiscard]] auto operator[](Parameter<T> const& parameter) const -> std::optional<T>
         {
-            return m_vector.at(parameter.index);
+            auto const string = m_vector.at(parameter.index);
+            return string.has_value() ? Argument<T>::parse(*string) : std::nullopt;
         }
     };
 
     [[nodiscard]] auto parse(Command_line, Parameters const&) -> Arguments;
 
 } // namespace cppargs
+
+template <>
+struct cppargs::Argument<cppargs::Unit> {
+    static auto parse(std::string_view) -> std::optional<Unit>
+    {
+        return Unit {};
+    }
+};
+
+template <>
+struct cppargs::Argument<std::string_view> {
+    static auto parse(std::string_view const view) -> std::optional<std::string_view>
+    {
+        return view;
+    }
+};
+
+template <>
+struct cppargs::Argument<std::string> {
+    static auto parse(std::string_view const view) -> std::optional<std::string>
+    {
+        return std::string(view);
+    }
+};
+
+template <>
+struct cppargs::Argument<char> {
+    static auto parse(std::string_view const view) -> std::optional<char>
+    {
+        if (view.size() == 1) {
+            return view.front();
+        }
+        else {
+            return std::nullopt;
+        }
+    }
+};
+
+template <>
+struct cppargs::Argument<bool> {
+    static auto parse(std::string_view const view) -> std::optional<bool>
+    {
+        if (view == "true" || view == "yes" || view == "on" || view == "1") {
+            return true;
+        }
+        else if (view == "false" || view == "no" || view == "off" || view == "0") {
+            return false;
+        }
+        else {
+            return std::nullopt;
+        }
+    }
+};
+
+template <std::integral T>
+struct cppargs::Argument<T> {
+    static auto parse(std::string_view const view) -> std::optional<T>
+    {
+        auto const begin = view.data();
+        auto const end   = begin + view.size();
+
+        T value;
+        auto const [ptr, ec] = std::from_chars(begin, end, value);
+
+        if (ptr == end && ec == std::errc {}) {
+            return value;
+        }
+        else {
+            return std::nullopt;
+        }
+    }
+};

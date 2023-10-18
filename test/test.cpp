@@ -6,12 +6,6 @@
 
 using namespace std::literals;
 
-static_assert(cppargs::parameter_type<int>);
-static_assert(cppargs::parameter_type<std::string>);
-static_assert(cppargs::parameter_type<std::vector<std::string>>);
-static_assert(!cppargs::parameter_type<std::vector<std::vector<std::string>>>);
-static_assert(!cppargs::parameter_type<double>);
-
 TEST("help string generation")
 {
     SECTION("non-empty")
@@ -126,22 +120,22 @@ TEST("parse aggregate short names")
 TEST("parse named argument")
 {
     cppargs::Parameters parameters;
-    auto const          a = parameters.add<std::string_view>('a', "aaa");
+    auto const          a = parameters.add<int>('a', "aaa");
     auto const          b = parameters.add<std::string_view>('b', "bbb");
     auto const          c = parameters.add('c', "ccc");
     SECTION("long name")
     {
-        char const* const command_line[] { "cppargstest", "--aaa", "hello" };
+        char const* const command_line[] { "cppargstest", "--aaa", "53" };
         auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments[a] == "hello");
+        REQUIRE(arguments[a] == 53);
         REQUIRE_FALSE(arguments[b].has_value());
         REQUIRE_FALSE(arguments[c].has_value());
     }
     SECTION("short name")
     {
-        char const* const command_line[] { "cppargstest", "-ahello", "-b", "qwerty" };
+        char const* const command_line[] { "cppargstest", "-a56", "-b", "qwerty" };
         auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments[a] == "hello");
+        REQUIRE(arguments[a] == 56);
         REQUIRE(arguments[b] == "qwerty");
         REQUIRE_FALSE(arguments[c].has_value());
     }
@@ -152,6 +146,45 @@ TEST("parse named argument")
         REQUIRE_FALSE(arguments[a].has_value());
         REQUIRE(arguments[b] == "abc");
         REQUIRE(arguments[c].has_value());
+    }
+}
+
+TEST("parse boolean argument")
+{
+    auto const parse = cppargs::Argument<bool>::parse;
+
+    REQUIRE(parse("true") == true);
+    REQUIRE(parse("yes") == true);
+    REQUIRE(parse("on") == true);
+    REQUIRE(parse("1") == true);
+
+    REQUIRE(parse("false") == false);
+    REQUIRE(parse("off") == false);
+    REQUIRE(parse("no") == false);
+    REQUIRE(parse("0") == false);
+
+    REQUIRE_FALSE(parse("truew").has_value());
+    REQUIRE_FALSE(parse("truew").has_value());
+    REQUIRE_FALSE(parse("falsew").has_value());
+    REQUIRE_FALSE(parse("offf").has_value());
+    REQUIRE_FALSE(parse("5").has_value());
+}
+
+TEST("parse integral argument")
+{
+    SECTION("signed")
+    {
+        auto const parse = cppargs::Argument<int>::parse;
+        REQUIRE(parse("53") == 53);
+        REQUIRE(parse("-53") == -53);
+        REQUIRE_FALSE(parse("+53").has_value());
+    }
+    SECTION("unsigned")
+    {
+        auto const parse = cppargs::Argument<unsigned>::parse;
+        REQUIRE(parse("53") == 53);
+        REQUIRE_FALSE(parse("-53").has_value());
+        REQUIRE_FALSE(parse("+53").has_value());
     }
 }
 
@@ -170,6 +203,24 @@ TEST("parse missing argument")
         REQUIRE(exception.info().error_column == 15);
         REQUIRE(exception.info().error_width == 11);
         REQUIRE(exception.what() == "Error: Missing argument for parameter 'interesting'"sv);
+    }
+}
+
+TEST("parse invalid argument")
+{
+    cppargs::Parameters parameters;
+    auto const          interesting_option = parameters.add<int>("interesting");
+    char const* const   command_line[] { "cppargstest", "--interesting", "hello" };
+    try {
+        (void)cppargs::parse(command_line, parameters);
+        REQUIRE_UNREACHABLE;
+    }
+    catch (cppargs::Exception const& exception) {
+        REQUIRE(exception.info().kind == cppargs::Parse_error_info::Kind::invalid_argument);
+        REQUIRE(exception.info().command_line == "cppargstest --interesting hello");
+        REQUIRE(exception.info().error_column == 27);
+        REQUIRE(exception.info().error_width == 5);
+        REQUIRE(exception.what() == "Error: Invalid argument 'hello'"sv);
     }
 }
 
