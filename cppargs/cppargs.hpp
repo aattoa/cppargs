@@ -37,6 +37,8 @@ namespace cppargs {
         [[nodiscard]] auto what() const noexcept -> char const* override;
     };
 
+    using Command_line = std::span<char const* const>;
+
     // Regular void
     struct Unit {};
 
@@ -66,9 +68,9 @@ namespace cppargs {
 
     template <class T>
     concept argument = requires(std::string_view const view) {
-        {
-            Argument<T>::parse(view)
-        } -> std::same_as<std::optional<T>>;
+        // clang-format off
+        { Argument<T>::parse(view) } -> std::same_as<std::optional<T>>;
+        // clang-format on
     };
 
     class Parameters {
@@ -85,8 +87,16 @@ namespace cppargs {
         {
             static constexpr dtl::Parameter_info::Validate* validate
                 = [](std::string_view const view) { return Argument<T>::parse(view).has_value(); };
-            return Parameter<T> { add_parameter(
-                short_name, long_name, description, std::is_same_v<T, Unit> ? nullptr : validate) };
+
+            auto const index = m_vector.size() + 1;
+            m_vector.push_back({
+                .validate    = std::is_same_v<T, Unit> ? nullptr : validate,
+                .long_name   = long_name,
+                .short_name  = short_name,
+                .description = description,
+                .index       = index,
+            });
+            return Parameter<T> { index };
         }
 
         template <argument T = Unit>
@@ -96,15 +106,7 @@ namespace cppargs {
         {
             return add<T>(std::nullopt, long_name, description);
         }
-    private:
-        auto add_parameter(
-            std::optional<char>            short_name,
-            std::string_view               long_name,
-            std::string_view               description,
-            dtl::Parameter_info::Validate* validate) -> std::size_t;
     };
-
-    using Command_line = std::span<char const* const>;
 
     class Arguments {
         std::vector<std::optional<std::string_view>> m_vector;
@@ -126,6 +128,8 @@ namespace cppargs {
     };
 
     [[nodiscard]] auto parse(Command_line, Parameters const&) -> Arguments;
+
+    [[nodiscard]] auto parse(int argc, char const* const* argv, Parameters const&) -> Arguments;
 
 } // namespace cppargs
 

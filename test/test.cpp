@@ -53,11 +53,10 @@ TEST("parse valid simple flag")
 
 TEST("parse invalid simple flag")
 {
-    cppargs::Parameters parameters;
-    auto const          help_flag = parameters.add('h', "help");
     SECTION("long name")
     {
-        char const* const command_line[] { "cppargstest", "--version" };
+        cppargs::Parameters parameters;
+        char const* const   command_line[] { "cppargstest", "--version" };
         try {
             (void)cppargs::parse(command_line, {});
             REQUIRE_UNREACHABLE;
@@ -67,7 +66,7 @@ TEST("parse invalid simple flag")
             REQUIRE(exception.info().command_line == "cppargstest --version");
             REQUIRE(exception.info().error_column == 15);
             REQUIRE(exception.info().error_width == 7);
-            REQUIRE(exception.what() == "Error: Unrecognized option 'version'"sv);
+            REQUIRE(exception.what() == "Unrecognized option 'version'"sv);
         }
     }
     SECTION("short name")
@@ -82,7 +81,7 @@ TEST("parse invalid simple flag")
             REQUIRE(exception.info().command_line == "cppargstest -v");
             REQUIRE(exception.info().error_column == 14);
             REQUIRE(exception.info().error_width == 1);
-            REQUIRE(exception.what() == "Error: Unrecognized option 'v'"sv);
+            REQUIRE(exception.what() == "Unrecognized option 'v'"sv);
         }
     }
 }
@@ -112,7 +111,7 @@ TEST("parse aggregate short names")
             REQUIRE(exception.info().command_line == "cppargstest -vx");
             REQUIRE(exception.info().error_column == 15);
             REQUIRE(exception.info().error_width == 1);
-            REQUIRE(exception.what() == "Error: Unrecognized option 'x'"sv);
+            REQUIRE(exception.what() == "Unrecognized option 'x'"sv);
         }
     }
 }
@@ -191,8 +190,8 @@ TEST("parse integral argument")
 TEST("parse missing argument")
 {
     cppargs::Parameters parameters;
-    auto const          interesting_option = parameters.add<int>("interesting");
-    char const* const   command_line[] { "cppargstest", "--interesting" };
+    (void)parameters.add<int>("interesting");
+    char const* const command_line[] { "cppargstest", "--interesting" };
     try {
         (void)cppargs::parse(command_line, parameters);
         REQUIRE_UNREACHABLE;
@@ -202,15 +201,15 @@ TEST("parse missing argument")
         REQUIRE(exception.info().command_line == "cppargstest --interesting");
         REQUIRE(exception.info().error_column == 15);
         REQUIRE(exception.info().error_width == 11);
-        REQUIRE(exception.what() == "Error: Missing argument for parameter 'interesting'"sv);
+        REQUIRE(exception.what() == "Missing argument for parameter 'interesting'"sv);
     }
 }
 
 TEST("parse invalid argument")
 {
     cppargs::Parameters parameters;
-    auto const          interesting_option = parameters.add<int>("interesting");
-    char const* const   command_line[] { "cppargstest", "--interesting", "hello" };
+    (void)parameters.add<int>("interesting");
+    char const* const command_line[] { "cppargstest", "--interesting", "hello" };
     try {
         (void)cppargs::parse(command_line, parameters);
         REQUIRE_UNREACHABLE;
@@ -220,15 +219,15 @@ TEST("parse invalid argument")
         REQUIRE(exception.info().command_line == "cppargstest --interesting hello");
         REQUIRE(exception.info().error_column == 27);
         REQUIRE(exception.info().error_width == 5);
-        REQUIRE(exception.what() == "Error: Invalid argument 'hello'"sv);
+        REQUIRE(exception.what() == "Invalid argument 'hello'"sv);
     }
 }
 
 TEST("parse positional argument")
 {
     cppargs::Parameters parameters;
-    auto const          help_flag = parameters.add("help");
-    char const* const   command_line[] { "cppargstest", "hello" };
+    (void)parameters.add("help");
+    char const* const command_line[] { "cppargstest", "hello" };
     try {
         (void)cppargs::parse(command_line, parameters);
         REQUIRE_UNREACHABLE;
@@ -238,6 +237,6 @@ TEST("parse positional argument")
         REQUIRE(exception.info().command_line == "cppargstest hello");
         REQUIRE(exception.info().error_column == 13);
         REQUIRE(exception.info().error_width == 5);
-        REQUIRE(exception.what() == "Error: Positional arguments are not supported yet: 'hello'"sv);
+        REQUIRE(exception.what() == "Positional arguments are not supported yet: 'hello'"sv);
     }
 }

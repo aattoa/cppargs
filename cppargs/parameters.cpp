@@ -1,23 +1,6 @@
 #include <cppargs.hpp>
 #include <format>
 
-auto cppargs::Parameters::add_parameter(
-    std::optional<char> const            short_name,
-    std::string_view const               long_name,
-    std::string_view const               description,
-    dtl::Parameter_info::Validate* const validate) -> std::size_t
-{
-    auto const index = m_vector.size() + 1;
-    m_vector.push_back({
-        .validate    = validate,
-        .long_name   = long_name,
-        .short_name  = short_name,
-        .description = description,
-        .index       = index,
-    });
-    return index;
-}
-
 auto cppargs::Parameters::help_string() const -> std::string
 {
     std::vector<std::pair<std::string, std::string_view>> lines;

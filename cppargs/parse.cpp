@@ -125,5 +125,13 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
         }
     }
 
-    return Arguments { std::move(arguments) };
+    return Arguments(std::move(arguments));
+}
+
+auto cppargs::parse(int const argc, char const* const* const argv, Parameters const& parameters)
+    -> Arguments
+{
+    assert(argc != 0);
+    assert(argv != nullptr);
+    return parse(Command_line(argv, argv + argc), parameters);
 }
