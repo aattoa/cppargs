@@ -20,7 +20,6 @@ arguments through tag objects that keep track of their type and identity.
 
 ```C++
 #include <cppargs.hpp>
-#include <exception>
 #include <print>
 
 int main(int argc, char const** argv)
@@ -51,7 +50,7 @@ int main(int argc, char const** argv)
 
 The above program might be invoked as follows:
 
-```Shell
+```
 $ prog --help
 List of options:
     --help, -h         : Show this help text

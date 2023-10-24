@@ -8,33 +8,32 @@ namespace {
     }
 } // namespace
 
-cppargs::Exception::Exception(Parse_error_info&& parse_error_info)
-    : m_parse_error_info(std::move(parse_error_info))
+auto cppargs::Parse_error_info::kind_to_string(Kind const kind) -> std::string_view
 {
-    switch (m_parse_error_info.kind) {
+    switch (kind) {
     case Parse_error_info::Kind::missing_argument:
-        m_exception_string = std::format(
-            "Missing argument for parameter '{}'", error_substring(m_parse_error_info));
-        return;
+        return "Missing argument for parameter";
     case Parse_error_info::Kind::invalid_argument:
-        m_exception_string
-            = std::format("Invalid argument '{}'", error_substring(m_parse_error_info));
-        return;
+        return "Invalid argument";
     case Parse_error_info::Kind::unrecognized_option:
-        m_exception_string
-            = std::format("Unrecognized option '{}'", error_substring(m_parse_error_info));
-        return;
+        return "Unrecognized option";
     case Parse_error_info::Kind::positional_argument:
-        m_exception_string = std::format(
-            "Positional arguments are not supported yet: '{}'",
-            error_substring(m_parse_error_info));
-        return;
+        return "Positional arguments are not supported yet";
     default:
         throw std::invalid_argument {
-            "cppargs::Exception::Exception: Invalid Parse_error_info::Kind enumerator value"
+            "cppargs::Parse_error_info::kind_to_string: Invalid "
+            "Parse_error_info::Kind enumerator value",
         };
     }
 }
+
+cppargs::Exception::Exception(Parse_error_info&& parse_error_info)
+    : m_exception_string(std::format(
+        "{}: '{}'",
+        Parse_error_info::kind_to_string(parse_error_info.kind),
+        error_substring(parse_error_info)))
+    , m_parse_error_info(std::move(parse_error_info))
+{}
 
 auto cppargs::Exception::info() const noexcept -> Parse_error_info const&
 {

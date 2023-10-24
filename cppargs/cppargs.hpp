@@ -19,10 +19,13 @@ namespace cppargs {
             invalid_argument,
             positional_argument,
         };
+
         std::string command_line;
         Kind        kind {};
         std::size_t error_column {};
         std::size_t error_width {};
+
+        static auto kind_to_string(Kind) -> std::string_view;
     };
 
     // Thrown on parse failure
@@ -52,6 +55,16 @@ namespace cppargs {
         friend class Arguments;
     };
 
+    template <class>
+    struct Argument {};
+
+    template <class T>
+    concept argument = requires(std::string_view const view) {
+        // clang-format off
+        { Argument<T>::parse(view) } -> std::same_as<std::optional<T>>;
+        // clang-format on
+    };
+
     namespace dtl {
         struct Parameter_info {
             using Validate = auto(std::string_view) -> bool;
@@ -62,16 +75,6 @@ namespace cppargs {
             std::size_t         index {};
         };
     } // namespace dtl
-
-    template <class>
-    struct Argument {};
-
-    template <class T>
-    concept argument = requires(std::string_view const view) {
-        // clang-format off
-        { Argument<T>::parse(view) } -> std::same_as<std::optional<T>>;
-        // clang-format on
-    };
 
     class Parameters {
         std::vector<dtl::Parameter_info> m_vector;

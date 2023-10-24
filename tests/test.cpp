@@ -66,7 +66,7 @@ TEST("parse invalid simple flag")
             REQUIRE(exception.info().command_line == "cppargstest --version");
             REQUIRE(exception.info().error_column == 15);
             REQUIRE(exception.info().error_width == 7);
-            REQUIRE(exception.what() == "Unrecognized option 'version'"sv);
+            REQUIRE(exception.what() == "Unrecognized option: 'version'"sv);
         }
     }
     SECTION("short name")
@@ -81,7 +81,7 @@ TEST("parse invalid simple flag")
             REQUIRE(exception.info().command_line == "cppargstest -v");
             REQUIRE(exception.info().error_column == 14);
             REQUIRE(exception.info().error_width == 1);
-            REQUIRE(exception.what() == "Unrecognized option 'v'"sv);
+            REQUIRE(exception.what() == "Unrecognized option: 'v'"sv);
         }
     }
 }
@@ -111,7 +111,7 @@ TEST("parse aggregate short names")
             REQUIRE(exception.info().command_line == "cppargstest -vx");
             REQUIRE(exception.info().error_column == 15);
             REQUIRE(exception.info().error_width == 1);
-            REQUIRE(exception.what() == "Unrecognized option 'x'"sv);
+            REQUIRE(exception.what() == "Unrecognized option: 'x'"sv);
         }
     }
 }
@@ -201,7 +201,7 @@ TEST("parse missing argument")
         REQUIRE(exception.info().command_line == "cppargstest --interesting");
         REQUIRE(exception.info().error_column == 15);
         REQUIRE(exception.info().error_width == 11);
-        REQUIRE(exception.what() == "Missing argument for parameter 'interesting'"sv);
+        REQUIRE(exception.what() == "Missing argument for parameter: 'interesting'"sv);
     }
 }
 
@@ -219,7 +219,7 @@ TEST("parse invalid argument")
         REQUIRE(exception.info().command_line == "cppargstest --interesting hello");
         REQUIRE(exception.info().error_column == 27);
         REQUIRE(exception.info().error_width == 5);
-        REQUIRE(exception.what() == "Invalid argument 'hello'"sv);
+        REQUIRE(exception.what() == "Invalid argument: 'hello'"sv);
     }
 }
 
