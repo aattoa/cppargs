@@ -237,3 +237,18 @@ TEST("parse positional argument")
         REQUIRE(exception.what() == "Positional arguments are not supported yet: 'hello'"sv);
     }
 }
+
+TEST("incremental argument")
+{
+    cppargs::Parameters parameters;
+    auto const          ints = parameters.add<cppargs::Incremental<int>>('i', "int");
+    char const* const   command_line[] {
+        "cppargstest", "-i25", "--int", "30", "--int", "35", "-i", "40",
+    };
+    cppargs::parse(command_line, parameters);
+    REQUIRE(ints.values().size() == 4);
+    REQUIRE(ints.values()[0] == 25);
+    REQUIRE(ints.values()[1] == 30);
+    REQUIRE(ints.values()[2] == 35);
+    REQUIRE(ints.values()[3] == 40);
+}

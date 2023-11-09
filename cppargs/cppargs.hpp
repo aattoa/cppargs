@@ -10,30 +10,6 @@
 #include <vector>
 #include <span>
 
-namespace cppargs::dtl {
-    struct Parameter_info {
-        using Parse = auto(std::string_view, void*) -> bool;
-        Parse*              parse {};
-        void*               value {};
-        bool                is_flag {};
-        std::string_view    type_name;
-        std::string_view    long_name;
-        std::optional<char> short_name;
-        std::string_view    description;
-    };
-
-    template <class T>
-    consteval auto type_name() -> std::string_view
-    {
-        if constexpr (requires { T::type_name; }) {
-            return T::type_name;
-        }
-        else {
-            return "arg";
-        }
-    }
-} // namespace cppargs::dtl
-
 namespace cppargs {
 
     // Information needed to produce an error message
@@ -70,9 +46,86 @@ namespace cppargs {
     // Regular void
     struct Unit {};
 
+    // Incremental vector built up with multiple arguments
+    template <class>
+    struct Incremental {};
+
+    template <class>
+    struct Argument {};
+
+} // namespace cppargs
+
+namespace cppargs::dtl {
+
+    struct Parameter_info {
+        using Parse = auto(std::string_view, void*) -> bool;
+        Parse*              parse {};
+        void*               value {};
+        bool                is_flag {};
+        std::string_view    type_name;
+        std::string_view    long_name;
+        std::optional<char> short_name;
+        std::string_view    description;
+    };
+
+    template <class T>
+    consteval auto type_name() -> std::string_view
+    {
+        if constexpr (requires { Argument<T>::type_name; }) {
+            return Argument<T>::type_name;
+        }
+        else {
+            return "arg";
+        }
+    }
+
+    template <class T>
+    struct Parse {
+        static auto parse(std::string_view const string, void* const where) -> bool
+        {
+            if (auto result = Argument<T>::parse(string)) {
+                *static_cast<std::optional<T>*>(where) = std::move(result);
+                return true;
+            }
+            return false;
+        }
+    };
+
+    template <class T>
+    struct Parse<Incremental<T>> {
+        static auto parse(std::string_view const string, void* const where) -> bool
+        {
+            if (auto result = Argument<T>::parse(string)) {
+                static_cast<std::vector<T>*>(where)->push_back(std::move(*result));
+                return true;
+            }
+            return false;
+        }
+    };
+
+    template <class T>
+    concept has_parse = requires(std::string_view const view) {
+        // clang-format off
+        { Argument<T>::parse(view) } -> std::same_as<std::optional<T>>;
+        // clang-format on
+    };
+
+    template <class T>
+    struct Is_argument : std::bool_constant<has_parse<T>> {};
+
+    template <class T>
+    struct Is_argument<Incremental<T>> : Is_argument<T> {};
+
+} // namespace cppargs::dtl
+
+namespace cppargs {
+
+    template <class T>
+    concept argument = dtl::Is_argument<T>::value;
+
     template <class T>
     class Parameter {
-        std::unique_ptr<std::optional<T>> m_value;
+        std::unique_ptr<std::optional<T>> m_value = std::make_unique<std::optional<T>>();
         friend class Parameters;
     public:
         [[nodiscard]] auto value() const noexcept -> T const&
@@ -91,14 +144,20 @@ namespace cppargs {
         }
     };
 
-    template <class>
-    struct Argument {};
-
     template <class T>
-    concept argument = requires(std::string_view const view) {
-        // clang-format off
-        { Argument<T>::parse(view) } -> std::same_as<std::optional<T>>;
-        // clang-format on
+    class Parameter<Incremental<T>> {
+        std::unique_ptr<std::vector<T>> m_value = std::make_unique<std::vector<T>>();
+        friend class Parameters;
+    public:
+        [[nodiscard]] auto values() const noexcept -> std::span<T const>
+        {
+            return *m_value;
+        }
+
+        [[nodiscard]] explicit operator bool() const noexcept
+        {
+            return !values().empty();
+        }
     };
 
     class Parameters {
@@ -113,25 +172,16 @@ namespace cppargs {
             std::string_view const    long_name,
             std::string_view const    description = {}) -> Parameter<T>
         {
-            static constexpr dtl::Parameter_info::Parse* parse
-                = [](std::string_view const view, void* const where) {
-                      auto& optional = *static_cast<std::optional<T>*>(where);
-                      return (optional = Argument<T>::parse(view)).has_value();
-                  };
-
             Parameter<T> parameter;
-            parameter.m_value = std::make_unique<std::optional<T>>();
-
             m_vector.push_back({
-                .parse       = parse,
+                .parse       = dtl::Parse<T>::parse,
                 .value       = parameter.m_value.get(),
                 .is_flag     = std::is_same_v<T, Unit>,
-                .type_name   = dtl::type_name<Argument<T>>(),
+                .type_name   = dtl::type_name<T>(),
                 .long_name   = long_name,
                 .short_name  = short_name,
                 .description = description,
             });
-
             return parameter;
         }
 

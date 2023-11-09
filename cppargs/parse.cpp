@@ -45,12 +45,6 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
         throw std::invalid_argument { "cppargs::parse: Invalid command line" };
     }
 
-    std::vector<std::optional<std::string_view>> arguments(parameters.info_span().size() + 1);
-
-    if (command_line.front() != nullptr) {
-        arguments.front() = command_line.front();
-    }
-
     for (auto arg_it = command_line.begin() + 1; arg_it != command_line.end(); ++arg_it) {
         std::string_view const string = *arg_it;
 
