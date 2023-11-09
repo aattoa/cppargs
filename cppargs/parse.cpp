@@ -97,20 +97,17 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
                     (void)it->parse({}, it->value);
                 }
                 else if (char_it + 1 != string.end()) {
-                    ++offset;
                     std::string_view const argument(char_it + 1, string.end());
                     if (it->parse(argument, it->value)) {
                         break;
                     }
-                    else {
-                        throw exception(Parse_error_info::Kind::invalid_argument, argument, offset);
-                    }
+                    throw exception(Parse_error_info::Kind::invalid_argument, argument, offset + 1);
                 }
                 else if (arg_it + 1 == command_line.end()) {
                     throw exception(Parse_error_info::Kind::missing_argument, name, offset);
                 }
                 else if (!it->parse(*++arg_it, it->value)) {
-                    throw exception(Parse_error_info::Kind::invalid_argument, *arg_it, offset);
+                    throw exception(Parse_error_info::Kind::invalid_argument, *arg_it, 0);
                 }
             }
         }

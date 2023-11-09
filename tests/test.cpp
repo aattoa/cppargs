@@ -18,8 +18,8 @@ TEST("help string generation")
         REQUIRE(
             parameters.help_string()
             == "\t--help                  : Show this help text\n"
-               "\t--do-thing [arg]        : ...\n"
-               "\t--interesting, -i [arg] : Do interesting things\n"
+               "\t--do-thing [int]        : ...\n"
+               "\t--interesting, -i [str] : Do interesting things\n"
                "\t--version               : Show version information\n");
     }
     SECTION("empty")

@@ -12,7 +12,7 @@ auto cppargs::Parameters::help_string() const -> std::string
             std::format_to(std::back_inserter(line), ", -{}", parameter.short_name.value());
         }
         if (!parameter.is_flag) {
-            line.append(" [arg]");
+            std::format_to(std::back_inserter(line), " [{}]", parameter.type_name);
         }
         max_length = std::max(max_length, line.size());
         lines.emplace_back(std::move(line), parameter.description);

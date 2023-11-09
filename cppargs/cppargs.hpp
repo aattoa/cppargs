@@ -10,6 +10,30 @@
 #include <vector>
 #include <span>
 
+namespace cppargs::dtl {
+    struct Parameter_info {
+        using Parse = auto(std::string_view, void*) -> bool;
+        Parse*              parse {};
+        void*               value {};
+        bool                is_flag {};
+        std::string_view    type_name;
+        std::string_view    long_name;
+        std::optional<char> short_name;
+        std::string_view    description;
+    };
+
+    template <class T>
+    consteval auto type_name() -> std::string_view
+    {
+        if constexpr (requires { T::type_name; }) {
+            return T::type_name;
+        }
+        else {
+            return "arg";
+        }
+    }
+} // namespace cppargs::dtl
+
 namespace cppargs {
 
     // Information needed to produce an error message
@@ -77,18 +101,6 @@ namespace cppargs {
         // clang-format on
     };
 
-    namespace dtl {
-        struct Parameter_info {
-            using Parse = auto(std::string_view, void*) -> bool;
-            Parse*              parse {};
-            void*               value {};
-            bool                is_flag {};
-            std::string_view    long_name;
-            std::optional<char> short_name;
-            std::string_view    description;
-        };
-    } // namespace dtl
-
     class Parameters {
         std::vector<dtl::Parameter_info> m_vector;
     public:
@@ -114,6 +126,7 @@ namespace cppargs {
                 .parse       = parse,
                 .value       = parameter.m_value.get(),
                 .is_flag     = std::is_same_v<T, Unit>,
+                .type_name   = dtl::type_name<Argument<T>>(),
                 .long_name   = long_name,
                 .short_name  = short_name,
                 .description = description,
@@ -151,6 +164,8 @@ struct cppargs::Argument<std::string_view> {
     {
         return view;
     }
+
+    static constexpr std::string_view type_name = "str";
 };
 
 template <>
@@ -159,6 +174,8 @@ struct cppargs::Argument<std::string> {
     {
         return std::string(view);
     }
+
+    static constexpr std::string_view type_name = "str";
 };
 
 template <>
@@ -172,6 +189,8 @@ struct cppargs::Argument<char> {
             return std::nullopt;
         }
     }
+
+    static constexpr std::string_view type_name = "char";
 };
 
 template <>
@@ -188,6 +207,8 @@ struct cppargs::Argument<bool> {
             return std::nullopt;
         }
     }
+
+    static constexpr std::string_view type_name = "bool";
 };
 
 template <std::integral T>
@@ -207,4 +228,6 @@ struct cppargs::Argument<T> {
             return std::nullopt;
         }
     }
+
+    static constexpr std::string_view type_name = "int";
 };
