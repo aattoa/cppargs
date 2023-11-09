@@ -14,7 +14,7 @@ Most existing solutions, while effective, have some suboptimal properties:
   a statically typed language, so why not take advantage of that?
 
 `cppargs` solves both of these issues by only allowing the user to refer to
-arguments through tag objects that keep track of their type and identity.
+arguments through safe wrapper objects that are statically typed.
 
 # Example usage
 
@@ -27,18 +27,16 @@ int main(int argc, char const** argv)
     try {
         cppargs::Parameters parameters;
 
-        auto const help   = parameters.add('h', "help", "Show this help text");
-        auto const square = parameters.add<int>('s', "square", "Square an integer");
+        auto const help_flag     = parameters.add('h', "help", "Show this help text");
+        auto const square_option = parameters.add<int>('s', "square", "Square an integer");
 
-        auto const arguments = cppargs::parse(argc, argv, parameters);
+        cppargs::parse(argc, argv, parameters);
 
-        if (arguments[help]) {
+        if (help_flag) {
             std::println("List of options:\n{}", parameters.help_string());
-            return 0;
         }
-        if (auto const integer = arguments[square]) {
-            // integer is of type std::optional<int>
-            int const x = integer.value();
+        if (square_option) {
+            int const x = square_option.value();
             std::println("The square of {} is {}", x, x*x);
         }
     }

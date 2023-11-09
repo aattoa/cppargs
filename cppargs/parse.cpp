@@ -39,7 +39,7 @@ namespace {
     }
 } // namespace
 
-auto cppargs::parse(Command_line const command_line, Parameters const& parameters) -> Arguments
+auto cppargs::parse(Command_line const command_line, Parameters const& parameters) -> void
 {
     if (!is_valid_command_line(command_line)) {
         throw std::invalid_argument { "cppargs::parse: Invalid command line" };
@@ -73,16 +73,13 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
             if (it == parameters.info_span().end()) {
                 throw exception(Parse_error_info::Kind::unrecognized_option, name, 2);
             }
-            else if (it->validate == nullptr) {
-                arguments.at(it->index).emplace();
+            else if (it->is_flag) {
+                (void)it->parse({}, it->value);
             }
             else if (arg_it + 1 == command_line.end()) {
                 throw exception(Parse_error_info::Kind::missing_argument, name, 2);
             }
-            else if (it->validate(*++arg_it)) {
-                arguments.at(it->index) = *arg_it;
-            }
-            else {
+            else if (!it->parse(*++arg_it, it->value)) {
                 throw exception(Parse_error_info::Kind::invalid_argument, *arg_it, 0);
             }
         }
@@ -96,13 +93,13 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
                 if (it == parameters.info_span().end()) {
                     throw exception(Parse_error_info::Kind::unrecognized_option, name, offset);
                 }
-                else if (it->validate == nullptr) {
-                    arguments.at(it->index).emplace();
+                else if (it->is_flag) {
+                    (void)it->parse({}, it->value);
                 }
                 else if (char_it + 1 != string.end()) {
+                    ++offset;
                     std::string_view const argument(char_it + 1, string.end());
-                    if (it->validate(argument)) {
-                        arguments.at(it->index) = argument;
+                    if (it->parse(argument, it->value)) {
                         break;
                     }
                     else {
@@ -112,10 +109,7 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
                 else if (arg_it + 1 == command_line.end()) {
                     throw exception(Parse_error_info::Kind::missing_argument, name, offset);
                 }
-                else if (it->validate(*++arg_it)) {
-                    arguments.at(it->index) = *arg_it;
-                }
-                else {
+                else if (!it->parse(*++arg_it, it->value)) {
                     throw exception(Parse_error_info::Kind::invalid_argument, *arg_it, offset);
                 }
             }
@@ -124,12 +118,10 @@ auto cppargs::parse(Command_line const command_line, Parameters const& parameter
             throw exception(Parse_error_info::Kind::positional_argument, string, 0);
         }
     }
-
-    return Arguments(std::move(arguments));
 }
 
 auto cppargs::parse(int const argc, char const* const* const argv, Parameters const& parameters)
-    -> Arguments
+    -> void
 {
     assert(argc != 0);
     assert(argv != nullptr);

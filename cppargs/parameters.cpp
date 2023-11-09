@@ -11,7 +11,7 @@ auto cppargs::Parameters::help_string() const -> std::string
         if (parameter.short_name.has_value()) {
             std::format_to(std::back_inserter(line), ", -{}", parameter.short_name.value());
         }
-        if (parameter.validate != nullptr) {
+        if (!parameter.is_flag) {
             line.append(" [arg]");
         }
         max_length = std::max(max_length, line.size());

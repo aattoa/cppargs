@@ -5,6 +5,7 @@
 #include <optional>
 #include <charconv>
 #include <utility>
+#include <memory>
 #include <string>
 #include <vector>
 #include <span>
@@ -45,14 +46,25 @@ namespace cppargs {
     // Regular void
     struct Unit {};
 
-    template <class>
+    template <class T>
     class Parameter {
-        std::size_t index;
-
-        explicit constexpr Parameter(std::size_t const index) noexcept : index(index) {}
-
+        std::unique_ptr<std::optional<T>> m_value;
         friend class Parameters;
-        friend class Arguments;
+    public:
+        [[nodiscard]] auto value() const noexcept -> T const&
+        {
+            return m_value->value();
+        }
+
+        [[nodiscard]] auto has_value() const noexcept -> bool
+        {
+            return m_value->has_value();
+        }
+
+        [[nodiscard]] explicit operator bool() const noexcept
+        {
+            return has_value();
+        }
     };
 
     template <class>
@@ -67,12 +79,13 @@ namespace cppargs {
 
     namespace dtl {
         struct Parameter_info {
-            using Validate = auto(std::string_view) -> bool;
-            Validate*           validate {};
+            using Parse = auto(std::string_view, void*) -> bool;
+            Parse*              parse {};
+            void*               value {};
+            bool                is_flag {};
             std::string_view    long_name;
             std::optional<char> short_name;
             std::string_view    description;
-            std::size_t         index {};
         };
     } // namespace dtl
 
@@ -88,18 +101,25 @@ namespace cppargs {
             std::string_view const    long_name,
             std::string_view const    description = {}) -> Parameter<T>
         {
-            static constexpr dtl::Parameter_info::Validate* validate
-                = [](std::string_view const view) { return Argument<T>::parse(view).has_value(); };
+            static constexpr dtl::Parameter_info::Parse* parse
+                = [](std::string_view const view, void* const where) {
+                      auto& optional = *static_cast<std::optional<T>*>(where);
+                      return (optional = Argument<T>::parse(view)).has_value();
+                  };
 
-            auto const index = m_vector.size() + 1;
+            Parameter<T> parameter;
+            parameter.m_value = std::make_unique<std::optional<T>>();
+
             m_vector.push_back({
-                .validate    = std::is_same_v<T, Unit> ? nullptr : validate,
+                .parse       = parse,
+                .value       = parameter.m_value.get(),
+                .is_flag     = std::is_same_v<T, Unit>,
                 .long_name   = long_name,
                 .short_name  = short_name,
                 .description = description,
-                .index       = index,
             });
-            return Parameter<T> { index };
+
+            return parameter;
         }
 
         template <argument T = Unit>
@@ -111,28 +131,9 @@ namespace cppargs {
         }
     };
 
-    class Arguments {
-        std::vector<std::optional<std::string_view>> m_vector;
+    auto parse(Command_line command_line, Parameters const& parameters) -> void;
 
-        explicit Arguments(decltype(m_vector)&&) noexcept;
-
-        // Only `parse` can construct `Arguments`
-        friend auto parse(Command_line, Parameters const&) -> Arguments;
-    public:
-        // On most systems this will return the program name as it was invoked
-        [[nodiscard]] auto argv_0() const -> std::optional<std::string_view>;
-
-        template <argument T>
-        [[nodiscard]] auto operator[](Parameter<T> const& parameter) const -> std::optional<T>
-        {
-            auto const string = m_vector.at(parameter.index);
-            return string.has_value() ? Argument<T>::parse(*string) : std::nullopt;
-        }
-    };
-
-    [[nodiscard]] auto parse(Command_line, Parameters const&) -> Arguments;
-
-    [[nodiscard]] auto parse(int argc, char const* const* argv, Parameters const&) -> Arguments;
+    auto parse(int argc, char const* const* argv, Parameters const& parameters) -> void;
 
 } // namespace cppargs
 

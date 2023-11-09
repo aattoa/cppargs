@@ -36,18 +36,16 @@ TEST("parse valid simple flag")
     SECTION("long name")
     {
         char const* const command_line[] { "cppargstest", "--version" };
-        auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments.argv_0() == "cppargstest");
-        REQUIRE(arguments[version_flag].has_value());
-        REQUIRE_FALSE(arguments[help_flag].has_value());
+        cppargs::parse(command_line, parameters);
+        REQUIRE(version_flag.has_value());
+        REQUIRE_FALSE(help_flag.has_value());
     }
     SECTION("short name")
     {
         char const* const command_line[] { "cppargstest", "-h" };
-        auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments.argv_0() == "cppargstest");
-        REQUIRE(arguments[help_flag].has_value());
-        REQUIRE_FALSE(arguments[version_flag].has_value());
+        cppargs::parse(command_line, parameters);
+        REQUIRE(help_flag.has_value());
+        REQUIRE_FALSE(version_flag.has_value());
     }
 }
 
@@ -94,10 +92,9 @@ TEST("parse aggregate short names")
     SECTION("valid")
     {
         char const* const command_line[] { "cppargstest", "-vh" };
-        auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments.argv_0() == "cppargstest");
-        REQUIRE(arguments[help_flag].has_value());
-        REQUIRE(arguments[version_flag].has_value());
+        cppargs::parse(command_line, parameters);
+        REQUIRE(help_flag.has_value());
+        REQUIRE(version_flag.has_value());
     }
     SECTION("invalid")
     {
@@ -125,26 +122,26 @@ TEST("parse named argument")
     SECTION("long name")
     {
         char const* const command_line[] { "cppargstest", "--aaa", "53" };
-        auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments[a] == 53);
-        REQUIRE_FALSE(arguments[b].has_value());
-        REQUIRE_FALSE(arguments[c].has_value());
+        cppargs::parse(command_line, parameters);
+        REQUIRE(a.value() == 53);
+        REQUIRE_FALSE(b.has_value());
+        REQUIRE_FALSE(c.has_value());
     }
     SECTION("short name")
     {
         char const* const command_line[] { "cppargstest", "-a56", "-b", "qwerty" };
-        auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE(arguments[a] == 56);
-        REQUIRE(arguments[b] == "qwerty");
-        REQUIRE_FALSE(arguments[c].has_value());
+        cppargs::parse(command_line, parameters);
+        REQUIRE(a.value() == 56);
+        REQUIRE(b.value() == "qwerty");
+        REQUIRE_FALSE(c.has_value());
     }
     SECTION("aggregate short names")
     {
         char const* const command_line[] { "cppargstest", "-cbabc" };
-        auto const        arguments = cppargs::parse(command_line, parameters);
-        REQUIRE_FALSE(arguments[a].has_value());
-        REQUIRE(arguments[b] == "abc");
-        REQUIRE(arguments[c].has_value());
+        cppargs::parse(command_line, parameters);
+        REQUIRE_FALSE(a.has_value());
+        REQUIRE(b.value() == "abc");
+        REQUIRE(c.has_value());
     }
 }
 
